@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define PROMPT "\033[0;34mshell352>\033[0;32m "
 #define MAX_LINE 80
