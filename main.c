@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/wait.h>
 
 #define PROMPT "\033[0;34mshell352>\033[0;32m "
 #define MAX_LINE 80
@@ -19,50 +18,58 @@ struct command {
   enum builtin_t builtin;
   enum redirect_t redirect;
   char *file;
-  char *cmd;
+  char cmd[80];
   int bg;
 };
 
 struct background {
   pid_t pid;
-  struct command *cmd;
-  int code;
+  pid_t code;
+  char cmds[80];
 };
 
 static int bg_cmd_count = 0;
-static struct background bg_cmds[40];
+static struct background *bg_cmds[40];
 
 void check_bg_cmds() {
-  int exit_code;
   int i;
   int cur_count = 0;
 
-  for (i = 0; i < bg_cmd_count; i++) {
-    exit_code = getpgid(bg_cmds[i].pid);
-    bg_cmds[i].code = exit_code;
+  for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
+    bg_cmds[i]->code = getpgid(bg_cmds[i]->pid);
 
-    printf("[%d] Done %s\n", i + 1, bg_cmds[i].cmd->argv[0]);
+    if (bg_cmds[i]->code == -1)
+      printf("[%d] Done %s\n", i + 1, bg_cmds[i]->cmds);
   }
 
-  for (i = 0; i < bg_cmd_count; i++) {
-    if (bg_cmds[i].code != -1 && cur_count != i) {
+  for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
+    if (bg_cmds[i]->code != -1) {
       bg_cmds[cur_count] = bg_cmds[i];
       cur_count++;
+    } else {
+      free(bg_cmds[i]);
+      bg_cmds[i] = NULL;
     }
   }
 
   bg_cmd_count = cur_count;
 }
 
-void insert_bg_cmd(pid_t pid, struct command *cmd) {
-  struct background bg_cmd;
+void insert_bg_cmd(pid_t pid, struct command cmd) {
+  struct background *bg_cmd;
+  int i;
 
-  printf("[%d] %d\n", bg_cmd_count + 1, pid);
+  bg_cmd = malloc(sizeof(struct background));
 
-  bg_cmd.pid = pid;
-  bg_cmd.cmd = cmd;
+  for (i = 0; i < 40 && bg_cmds[i] != NULL; i++)
+    ;
 
-  bg_cmds[bg_cmd_count++] = bg_cmd;
+  printf("[%d] %d\n", i + 1, pid);
+
+  bg_cmd->pid = pid;
+  strcpy(bg_cmd->cmds, cmd.cmd);
+
+  bg_cmds[i] = bg_cmd;
 }
 
 static int get_length(char *str) {
@@ -72,6 +79,11 @@ static int get_length(char *str) {
     ;
 
   return len;
+}
+
+void wait_pid(pid_t pid) {
+  while (waitpid(pid, NULL, 0) == 0)
+    ;
 }
 
 /**
@@ -227,6 +239,7 @@ void run_system_command(struct command *cmd) {
     fprintf(stderr, "fork() error");
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
                                // is the child process
+    fflush(stdout);
     fd = redirect(
         cmd); // Calls redirect helper which redirects input/output if necessary
 
@@ -247,9 +260,9 @@ void run_system_command(struct command *cmd) {
 
   } else {
     if (cmd->bg) {
-      insert_bg_cmd(child_pid, cmd);
+      insert_bg_cmd(child_pid, *cmd);
     } else {
-      wait(&child_pid);
+      wait_pid(child_pid);
     }
     check_bg_cmds();
   }
@@ -292,9 +305,9 @@ int run_builtin_command(struct command *cmd) {
     }
   } else {
     if (cmd->bg) {
-      insert_bg_cmd(child_pid, cmd);
+      insert_bg_cmd(child_pid, *cmd);
     } else {
-      wait(&child_pid);
+      wait_pid(child_pid);
     }
     check_bg_cmds();
   }
@@ -313,7 +326,6 @@ int eval(char *cmdline) {
   struct command cmd;
   int ret;
 
-  cmd.cmd = malloc(strlen(cmdline) * 8);
   strcpy(cmd.cmd, cmdline);
 
   // Parses the command
@@ -330,8 +342,6 @@ int eval(char *cmdline) {
   } else { // Runs builtin command and returns it's return value
     ret = run_builtin_command(&cmd);
   }
-
-  if (!cmd.bg) free(cmd.cmd);
 
   return ret;
 }
