@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #define PROMPT "\033[0;34mshell352>\033[0;32m "
 #define MAX_LINE 80
@@ -29,40 +29,44 @@ struct background {
   int code;
 };
 
-static int bg_cmd_count = 0;
-static struct background bg_cmds[40];
+struct background_cmds {
+  int count;
+  pid_t pids[40];
+  char *cmdss[40];
+  int codes[40];
+};
+
+static struct background_cmds *bg_cmds;
 
 void check_bg_cmds() {
   int exit_code;
   int i;
   int cur_count = 0;
 
-  for (i = 0; i < bg_cmd_count; i++) {
-    exit_code = getpgid(bg_cmds[i].pid);
-    bg_cmds[i].code = exit_code;
+  for (i = 0; i < bg_cmds->count; i++) {
+    exit_code = getpgid(bg_cmds->pids[i]);
+    bg_cmds->codes[i] = exit_code;
 
-    printf("[%d] Done %s\n", i + 1, bg_cmds[i].cmd->argv[0]);
+    printf("[%d] Done %s\n", i + 1, bg_cmds->cmdss[i]);
   }
 
-  for (i = 0; i < bg_cmd_count; i++) {
-    if (bg_cmds[i].code != -1 && cur_count != i) {
-      bg_cmds[cur_count] = bg_cmds[i];
+  for (i = 0; i < bg_cmds->count; i++) {
+    if (bg_cmds->codes[i] != -1 && cur_count != i) {
+      bg_cmds->pids[cur_count] = bg_cmds->pids[i];
+      bg_cmds->codes[cur_count] = bg_cmds->codes[i];
+      bg_cmds->cmdss[cur_count] = bg_cmds->cmdss[i];
       cur_count++;
     }
   }
 
-  bg_cmd_count = cur_count;
+  bg_cmds->count = cur_count;
 }
 
 void insert_bg_cmd(pid_t pid, struct command *cmd) {
-  struct background bg_cmd;
+  printf("[%d] %d\n", bg_cmds->count + 1, pid);
 
-  printf("[%d] %d\n", bg_cmd_count + 1, pid);
-
-  bg_cmd.pid = pid;
-  bg_cmd.cmd = cmd;
-
-  bg_cmds[bg_cmd_count++] = bg_cmd;
+  strcpy(bg_cmds->cmdss[bg_cmds->count++], cmd->cmd);
+  bg_cmds->pids[bg_cmds->count++] = pid;
 }
 
 static int get_length(char *str) {
@@ -331,7 +335,8 @@ int eval(char *cmdline) {
     ret = run_builtin_command(&cmd);
   }
 
-  if (!cmd.bg) free(cmd.cmd);
+  if (!cmd.bg)
+    free(cmd.cmd);
 
   return ret;
 }
@@ -341,6 +346,8 @@ int main(void) {
   int should_run = 1;
   char *fgets_r;
   int ferror_r;
+
+  bg_cmds = malloc(sizeof(*bg_cmds));
 
   while (should_run) {
     printf("%s", PROMPT);
