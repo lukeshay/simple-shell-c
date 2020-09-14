@@ -119,6 +119,14 @@ enum builtin_t parse_builtin(struct command *cmd) {
   }
 }
 
+/**
+ * Parses the string by breaking it up into words and determines whether the
+ * command is builtin or not. This function loops through and when a delimiter
+ * is hit, the word gets added to cmd->argv. A function is then called that
+ * determines if the command is builtin. This function returns whether the
+ * parsed command should run in the background. If it should, then 1 is
+ * returned.
+ */
 void parse_strtok(struct command *cmd) {
   const char delims[10] = " \t\r\n";
   char *ptr;
@@ -171,103 +179,6 @@ void parse_strtok(struct command *cmd) {
 }
 
 /**
- * Parses the string by breaking it up into words and determines whether the
- * command is builtin or not. This function loops through and when a delimiter
- * is hit, the word gets added to cmd->argv. A function is then called that
- * determines if the command is builtin. This function returns whether the
- * parsed command should run in the background. If it should, then 1 is
- * returned.
- */
-int parse(char *cmdline, struct command *cmd) {
-  char delims[10] = " \t\r\n";
-  char *line;
-  char *token;
-  char *endline;
-  int is_bg;
-
-  int redirected = 0;
-  int length;
-
-  if (cmdline == NULL) {
-    fprintf(stderr, "Command line is NULL\n");
-  }
-
-  line = malloc(strlen(cmdline) + 1);
-  strcpy(line, cmdline);
-
-  (void)strncpy(line, cmdline, MAX_LINE);
-  endline = line + strlen(line);
-
-  cmd->argc = 0;
-  cmd->redirect = (enum redirect_t)NO;
-  cmd->file = "";
-
-  while (line < endline) {
-    line += strspn(line, delims);
-    if (line >= endline)
-      break;
-
-    // Sets token to next delim
-    token = line + strcspn(line, delims);
-
-    // Sets token to NULL character
-    *token = '\0';
-
-    // Gets the length of the line. Since token was set to '\0', the length is
-    // calculated to their
-    length = get_length(line);
-
-    // Continues the loop in the case the string is empty
-    if (length == 0) {
-      line = token + 1;
-      continue;
-    }
-
-    // If the last string was a redirect, then we set this one to the file and
-    // break the loop
-    if (redirected) {
-      cmd->file = line;
-      break;
-    } else {
-      cmd->argv[cmd->argc++] = line;
-    }
-
-    // Check if the current string is a redirect
-    if (length == 1 && line[0] == '>') {
-      cmd->argc--;
-      cmd->redirect = (enum redirect_t)OUT;
-      redirected = 1;
-    } else if (length == 1 && line[0] == '<') {
-      cmd->argc--;
-      cmd->redirect = (enum redirect_t)IN;
-      redirected = 1;
-    }
-
-    if (cmd->argc >= MAX_ARGS - 1) {
-      break;
-    }
-
-    // Moved line to the character after the token
-    line = token + 1;
-  }
-
-  cmd->argv[cmd->argc] = NULL;
-
-  if (cmd->argc == 0) {
-    return 1;
-  }
-
-  // Checks if the command is a builtin
-  cmd->builtin = parse_builtin(cmd);
-
-  // Checks if the command should run the background
-  if ((is_bg = (*cmd->argv[cmd->argc - 1] == '&')) != 0)
-    cmd->argv[--cmd->argc] = NULL;
-
-  return is_bg;
-}
-
-/**
  * This function redirects the input or output of a command. This function first
  * checks if the file exits for a redirect out. If it does not, it will create
  * the file. The redirection is done using dup2.
@@ -306,7 +217,7 @@ int redirect(struct command *cmd) {
  * Runs the given system command by first forking and then waiting for the child
  * process to finish if the command is supposed to run in the foreground.
  */
-void run_system_command(struct command *cmd, int bg) {
+void run_system_command(struct command *cmd) {
   pid_t child_pid;
   int fd;
 
@@ -320,7 +231,7 @@ void run_system_command(struct command *cmd, int bg) {
 
     if (fd == -1) {
       fprintf(stderr, "Error opening file '%s'", cmd->file);
-      exit(-1);
+      exit(0);
     }
 
     if (execvp(cmd->argv[0], cmd->argv) < 0) {
@@ -334,7 +245,7 @@ void run_system_command(struct command *cmd, int bg) {
     }
 
   } else {
-    if (bg) {
+    if (cmd->bg) {
       insert_bg_cmd(child_pid, cmd);
     } else {
       wait(&child_pid);
@@ -348,7 +259,7 @@ void run_system_command(struct command *cmd, int bg) {
  * the shell should continue. If the shell should exit, 0 is returned from this
  * function.
  */
-int run_builtin_command(struct command *cmd, int bg) {
+int run_builtin_command(struct command *cmd) {
   int status = 1;
   pid_t child_pid;
 
@@ -376,10 +287,10 @@ int run_builtin_command(struct command *cmd, int bg) {
 
     if (status < 0) {
       fprintf(stderr, "Error running builtin: %s\n", cmd->argv[0]);
-      exit(-1);
+      exit(0);
     }
   } else {
-    if (bg) {
+    if (cmd->bg) {
       insert_bg_cmd(child_pid, cmd);
     } else {
       wait(&child_pid);
@@ -398,29 +309,25 @@ int run_builtin_command(struct command *cmd, int bg) {
  * off to run_builtin_command.
  */
 int eval(char *cmdline) {
-  int bg;
   struct command cmd;
   int ret;
 
   cmd.cmd = malloc(strlen(cmdline) * 8);
   strcpy(cmd.cmd, cmdline);
 
+  // Parses the command
   parse_strtok(&cmd);
 
-  bg = cmd.bg;
-  // Parses the command
-  // bg = parse(cmdline, &cmd);
-
   // If bg is -1 or the command is NULL, we return to get the next command
-  if (bg == -1 || cmd.argv[0] == NULL) {
+  if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
   } else if (cmd.builtin ==
              (enum builtin_t)NONE) { // Runs the system command and returns
 
-    run_system_command(&cmd, bg);
+    run_system_command(&cmd);
     ret = 1;
   } else { // Runs builtin command and returns it's return value
-    ret = run_builtin_command(&cmd, bg);
+    ret = run_builtin_command(&cmd);
   }
 
   free(cmd.cmd);
