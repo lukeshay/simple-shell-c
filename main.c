@@ -29,8 +29,8 @@ struct background {
   int code;
 };
 
-int bg_cmd_count = 0;
-struct background bg_cmds[40];
+static int bg_cmd_count = 0;
+static struct background bg_cmds[40];
 
 void check_bg_cmds() {
   int exit_code;
@@ -77,7 +77,7 @@ static int get_length(char *str) {
 /**
  * Runs the 'cd' command.
  */
-int builtin_cd(char **args) {
+static int builtin_cd(char **args) {
   if (args[1] == NULL) {
     fprintf(stderr, "Expected argument to \"cd\"\n");
     return -1;
@@ -93,7 +93,7 @@ int builtin_cd(char **args) {
 /**
  * Runs the 'kill' command.
  */
-int builtin_kill(char **args) {
+static int builtin_kill(char **args) {
   if (args[1] == NULL) {
     fprintf(stderr, "No PID provided");
     return -1;
@@ -107,7 +107,7 @@ int builtin_kill(char **args) {
 /**
  * Checks cmd->argv[0] to see if it is a builtin command.
  */
-enum builtin_t parse_builtin(struct command *cmd) {
+static enum builtin_t parse_builtin(struct command *cmd) {
   if (strcmp(cmd->argv[0], "cd") == 0) {
     return (enum builtin_t)CD;
   } else if (strcmp(cmd->argv[0], "exit") == 0) {
@@ -128,7 +128,7 @@ enum builtin_t parse_builtin(struct command *cmd) {
  * parsed command should run in the background. If it should, then 1 is
  * returned.
  */
-void parse_strtok(struct command *cmd) {
+static void parse_strtok(struct command *cmd) {
   const char delims[10] = " \t\r\n";
   char *ptr;
   int length;
@@ -184,7 +184,7 @@ void parse_strtok(struct command *cmd) {
  * checks if the file exits for a redirect out. If it does not, it will create
  * the file. The redirection is done using dup2.
  */
-int redirect(struct command *cmd) {
+static int redirect(struct command *cmd) {
   int fd = -2;
   FILE *file;
 
@@ -331,7 +331,7 @@ int eval(char *cmdline) {
     ret = run_builtin_command(&cmd);
   }
 
-  free(cmd.cmd);
+  if (!cmd.bg) free(cmd.cmd);
 
   return ret;
 }
