@@ -3,24 +3,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #define PROMPT "\033[0;34mshell352>\033[0;32m "
 #define MAX_LINE 80
 #define MAX_ARGS 128
 
-enum builtin_t {
-  NONE,
-  QUIT,
-  CD,
-  KILL
-};
-enum redirect_t {
-  NO,
-  IN,
-  OUT
-};
+enum builtin_t { NONE, QUIT, CD, KILL };
+enum redirect_t { NO, IN, OUT };
 
 struct command {
   int argc;
@@ -72,7 +63,7 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   bg_cmd = malloc(sizeof(struct background));
 
   for (i = 0; i < 40 && bg_cmds[i] != NULL; i++)
-  ;
+    ;
 
   printf("[%d] %d\n", i + 1, pid);
 
@@ -86,15 +77,14 @@ int get_length(char *str) {
   int len;
 
   for (len = 0; str[len] != '\0'; len++)
-  ;
+    ;
 
   return len;
 }
 
 void wait_pid(pid_t pid) {
   while (waitpid(pid, NULL, 0) == 0)
-  ;
-  printf("Done waiting");
+    ;
 }
 
 /**
@@ -132,14 +122,14 @@ int builtin_kill(char **args) {
  */
 enum builtin_t parse_builtin(struct command *cmd) {
   if (strcmp(cmd->argv[0], "cd") == 0) {
-    return (enum builtin_t) CD;
+    return (enum builtin_t)CD;
   } else if (strcmp(cmd->argv[0], "exit") == 0) {
-    return (enum builtin_t) QUIT;
+    return (enum builtin_t)QUIT;
   } else if (strcmp(cmd->argv[0], "kill") == 0 ||
-    strcmp(cmd->argv[0], "KILL") == 0) {
-    return (enum builtin_t) KILL;
+             strcmp(cmd->argv[0], "KILL") == 0) {
+    return (enum builtin_t)KILL;
   } else {
-    return (enum builtin_t) NONE;
+    return (enum builtin_t)NONE;
   }
 }
 
@@ -157,7 +147,7 @@ void parse(struct command *cmd) {
   int length;
 
   cmd->argc = 0;
-  cmd->redirect = (enum redirect_t) NO;
+  cmd->redirect = (enum redirect_t)NO;
   cmd->file = "";
   cmd->bg = 0;
 
@@ -166,7 +156,7 @@ void parse(struct command *cmd) {
   while (ptr != NULL) {
     length = get_length(ptr);
 
-    if (cmd->redirect != (enum redirect_t) NO) {
+    if (cmd->redirect != (enum redirect_t)NO) {
       cmd->file = ptr;
       break;
     } else {
@@ -175,10 +165,10 @@ void parse(struct command *cmd) {
 
     if (length == 1 && ptr[0] == '>') {
       cmd->argc--;
-      cmd->redirect = (enum redirect_t) OUT;
+      cmd->redirect = (enum redirect_t)OUT;
     } else if (length == 1 && ptr[0] == '<') {
       cmd->argc--;
-      cmd->redirect = (enum redirect_t) IN;
+      cmd->redirect = (enum redirect_t)IN;
     }
 
     if (cmd->argc >= MAX_ARGS - 1) {
@@ -198,7 +188,7 @@ void parse(struct command *cmd) {
   cmd->builtin = parse_builtin(cmd);
 
   // Checks if the command should run the background
-  if ((cmd->bg = ( *cmd->argv[cmd->argc - 1] == '&')) != 0)
+  if ((cmd->bg = (*cmd->argv[cmd->argc - 1] == '&')) != 0)
     cmd->argv[--cmd->argc] = NULL;
 }
 
@@ -212,7 +202,7 @@ int redirect(struct command *cmd) {
   FILE *file;
 
   // Check if there is a redirect in or out
-  if (cmd->redirect == (enum redirect_t) OUT) {
+  if (cmd->redirect == (enum redirect_t)OUT) {
     // Creates the file if it does not exist
     if (access(cmd->file, F_OK) == -1) {
       file = fopen(cmd->file, "w");
@@ -227,7 +217,7 @@ int redirect(struct command *cmd) {
     if ((fd = open(cmd->file, O_WRONLY)) != -1) {
       dup2(fd, STDOUT_FILENO);
     }
-  } else if (cmd->redirect == (enum redirect_t) IN) {
+  } else if (cmd->redirect == (enum redirect_t)IN) {
     // Attempts to open the file and returns the fd
     if ((fd = open(cmd->file, O_RDONLY)) != -1) {
       dup2(fd, STDIN_FILENO);
@@ -251,7 +241,7 @@ void run_system_command(struct command *cmd) {
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
     // is the child process
     fd = redirect(
-      cmd); // Calls redirect helper which redirects input/output if necessary
+        cmd); // Calls redirect helper which redirects input/output if necessary
 
     if (fd == -1) {
       fprintf(stderr, "Error opening file '%s'", cmd->file);
@@ -260,6 +250,10 @@ void run_system_command(struct command *cmd) {
 
     if (execvp(cmd->argv[0], cmd->argv) < 0) {
       fprintf(stderr, "Command not found: %s\n", cmd->argv[0]);
+      if (fd >= 0) {
+        close(fd);
+      }
+
       exit(0);
     }
 
@@ -284,11 +278,12 @@ void run_system_command(struct command *cmd) {
  *function.
  */
 int run_builtin_command(struct command *cmd) {
-  int status = 1;
+  int status = 0;
   pid_t child_pid;
+  int fd;
 
   // Returns 0 if the shell should quit.
-  if (cmd->builtin == (enum builtin_t) QUIT) {
+  if (cmd->builtin == (enum builtin_t)QUIT) {
     return 0;
   }
 
@@ -297,6 +292,14 @@ int run_builtin_command(struct command *cmd) {
     fprintf(stderr, "fork() error");
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
     // is the child process
+    fd = redirect(
+        cmd); // Calls redirect helper which redirects input/output if necessary
+
+    if (fd == -1) {
+      fprintf(stderr, "Error opening file '%s'", cmd->file);
+      exit(0);
+    }
+
     switch (cmd->builtin) {
     case CD:
       status = builtin_cd(cmd->argv);
@@ -307,6 +310,11 @@ int run_builtin_command(struct command *cmd) {
     default:
       fprintf(stderr, "%s does not exist\n", cmd->argv[0]);
       break;
+    }
+
+    // Close file if one was opened.
+    if (fd >= 0) {
+      close(fd);
     }
 
     if (status < 0) {
@@ -339,18 +347,18 @@ int eval(char *cmdline) {
   strcpy(cmd.cmd, cmdline);
 
   // Parses the command
-  parse( & cmd);
+  parse(&cmd);
 
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
   } else if (cmd.builtin ==
-    (enum builtin_t) NONE) { // Runs the system command and returns
+             (enum builtin_t)NONE) { // Runs the system command and returns
 
-    run_system_command( & cmd);
+    run_system_command(&cmd);
     ret = 1;
   } else { // Runs builtin command and returns it's return value
-    ret = run_builtin_command( & cmd);
+    ret = run_builtin_command(&cmd);
   }
 
   return ret;
