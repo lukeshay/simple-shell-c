@@ -4,13 +4,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define PROMPT "\033[0;34mshell352>\033[0;32m "
 #define MAX_LINE 80
 #define MAX_ARGS 128
 
-enum builtin_t { NONE, QUIT, CD, KILL };
-enum redirect_t { NO, IN, OUT };
+enum builtin_t {
+  NONE,
+  QUIT,
+  CD,
+  KILL
+};
+enum redirect_t {
+  NO,
+  IN,
+  OUT
+};
 
 struct command {
   int argc;
@@ -62,7 +72,7 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   bg_cmd = malloc(sizeof(struct background));
 
   for (i = 0; i < 40 && bg_cmds[i] != NULL; i++)
-    ;
+  ;
 
   printf("[%d] %d\n", i + 1, pid);
 
@@ -72,24 +82,25 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   bg_cmds[i] = bg_cmd;
 }
 
-static int get_length(char *str) {
+int get_length(char *str) {
   int len;
 
   for (len = 0; str[len] != '\0'; len++)
-    ;
+  ;
 
   return len;
 }
 
 void wait_pid(pid_t pid) {
   while (waitpid(pid, NULL, 0) == 0)
-    ;
+  ;
+  printf("Done waiting");
 }
 
 /**
- * Runs the 'cd' command.
+ *Runs the 'cd' command.
  */
-static int builtin_cd(char **args) {
+int builtin_cd(char **args) {
   if (args[1] == NULL) {
     fprintf(stderr, "Expected argument to \"cd\"\n");
     return -1;
@@ -103,9 +114,9 @@ static int builtin_cd(char **args) {
 }
 
 /**
- * Runs the 'kill' command.
+ *Runs the 'kill' command.
  */
-static int builtin_kill(char **args) {
+int builtin_kill(char **args) {
   if (args[1] == NULL) {
     fprintf(stderr, "No PID provided");
     return -1;
@@ -117,36 +128,36 @@ static int builtin_kill(char **args) {
 }
 
 /**
- * Checks cmd->argv[0] to see if it is a builtin command.
+ *Checks cmd->argv[0] to see if it is a builtin command.
  */
-static enum builtin_t parse_builtin(struct command *cmd) {
+enum builtin_t parse_builtin(struct command *cmd) {
   if (strcmp(cmd->argv[0], "cd") == 0) {
-    return (enum builtin_t)CD;
+    return (enum builtin_t) CD;
   } else if (strcmp(cmd->argv[0], "exit") == 0) {
-    return (enum builtin_t)QUIT;
+    return (enum builtin_t) QUIT;
   } else if (strcmp(cmd->argv[0], "kill") == 0 ||
-             strcmp(cmd->argv[0], "KILL") == 0) {
-    return (enum builtin_t)KILL;
+    strcmp(cmd->argv[0], "KILL") == 0) {
+    return (enum builtin_t) KILL;
   } else {
-    return (enum builtin_t)NONE;
+    return (enum builtin_t) NONE;
   }
 }
 
 /**
- * Parses the string by breaking it up into words and determines whether the
- * command is builtin or not. This function loops through and when a delimiter
- * is hit, the word gets added to cmd->argv. A function is then called that
- * determines if the command is builtin. This function returns whether the
- * parsed command should run in the background. If it should, then 1 is
- * returned.
+ *Parses the string by breaking it up into words and determines whether the
+ *command is builtin or not. This function loops through and when a delimiter
+ *is hit, the word gets added to cmd->argv. A function is then called that
+ *determines if the command is builtin. This function returns whether the
+ *parsed command should run in the background. If it should, then 1 is
+ *returned.
  */
-static void parse_strtok(struct command *cmd) {
+void parse(struct command *cmd) {
   const char delims[10] = " \t\r\n";
   char *ptr;
   int length;
 
   cmd->argc = 0;
-  cmd->redirect = (enum redirect_t)NO;
+  cmd->redirect = (enum redirect_t) NO;
   cmd->file = "";
   cmd->bg = 0;
 
@@ -155,7 +166,7 @@ static void parse_strtok(struct command *cmd) {
   while (ptr != NULL) {
     length = get_length(ptr);
 
-    if (cmd->redirect != (enum redirect_t)NO) {
+    if (cmd->redirect != (enum redirect_t) NO) {
       cmd->file = ptr;
       break;
     } else {
@@ -164,10 +175,10 @@ static void parse_strtok(struct command *cmd) {
 
     if (length == 1 && ptr[0] == '>') {
       cmd->argc--;
-      cmd->redirect = (enum redirect_t)OUT;
+      cmd->redirect = (enum redirect_t) OUT;
     } else if (length == 1 && ptr[0] == '<') {
       cmd->argc--;
-      cmd->redirect = (enum redirect_t)IN;
+      cmd->redirect = (enum redirect_t) IN;
     }
 
     if (cmd->argc >= MAX_ARGS - 1) {
@@ -187,21 +198,21 @@ static void parse_strtok(struct command *cmd) {
   cmd->builtin = parse_builtin(cmd);
 
   // Checks if the command should run the background
-  if ((cmd->bg = (*cmd->argv[cmd->argc - 1] == '&')) != 0)
+  if ((cmd->bg = ( *cmd->argv[cmd->argc - 1] == '&')) != 0)
     cmd->argv[--cmd->argc] = NULL;
 }
 
 /**
- * This function redirects the input or output of a command. This function first
- * checks if the file exits for a redirect out. If it does not, it will create
- * the file. The redirection is done using dup2.
+ *This function redirects the input or output of a command. This function first
+ *checks if the file exits for a redirect out. If it does not, it will create
+ *the file. The redirection is done using dup2.
  */
-static int redirect(struct command *cmd) {
+int redirect(struct command *cmd) {
   int fd = -2;
   FILE *file;
 
   // Check if there is a redirect in or out
-  if (cmd->redirect == (enum redirect_t)OUT) {
+  if (cmd->redirect == (enum redirect_t) OUT) {
     // Creates the file if it does not exist
     if (access(cmd->file, F_OK) == -1) {
       file = fopen(cmd->file, "w");
@@ -216,7 +227,7 @@ static int redirect(struct command *cmd) {
     if ((fd = open(cmd->file, O_WRONLY)) != -1) {
       dup2(fd, STDOUT_FILENO);
     }
-  } else if (cmd->redirect == (enum redirect_t)IN) {
+  } else if (cmd->redirect == (enum redirect_t) IN) {
     // Attempts to open the file and returns the fd
     if ((fd = open(cmd->file, O_RDONLY)) != -1) {
       dup2(fd, STDIN_FILENO);
@@ -227,8 +238,8 @@ static int redirect(struct command *cmd) {
 }
 
 /**
- * Runs the given system command by first forking and then waiting for the child
- * process to finish if the command is supposed to run in the foreground.
+ *Runs the given system command by first forking and then waiting for the child
+ *process to finish if the command is supposed to run in the foreground.
  */
 void run_system_command(struct command *cmd) {
   pid_t child_pid;
@@ -238,10 +249,9 @@ void run_system_command(struct command *cmd) {
   if ((child_pid = fork()) < 0) {
     fprintf(stderr, "fork() error");
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
-                               // is the child process
-    fflush(stdout);
+    // is the child process
     fd = redirect(
-        cmd); // Calls redirect helper which redirects input/output if necessary
+      cmd); // Calls redirect helper which redirects input/output if necessary
 
     if (fd == -1) {
       fprintf(stderr, "Error opening file '%s'", cmd->file);
@@ -269,16 +279,16 @@ void run_system_command(struct command *cmd) {
 }
 
 /**
- * Runs the given built in command. The return value of this function is whether
- * the shell should continue. If the shell should exit, 0 is returned from this
- * function.
+ *Runs the given built in command. The return value of this function is whether
+ *the shell should continue. If the shell should exit, 0 is returned from this
+ *function.
  */
 int run_builtin_command(struct command *cmd) {
   int status = 1;
   pid_t child_pid;
 
   // Returns 0 if the shell should quit.
-  if (cmd->builtin == (enum builtin_t)QUIT) {
+  if (cmd->builtin == (enum builtin_t) QUIT) {
     return 0;
   }
 
@@ -286,7 +296,7 @@ int run_builtin_command(struct command *cmd) {
   if ((child_pid = fork()) < 0) {
     fprintf(stderr, "fork() error");
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
-                               // is the child process
+    // is the child process
     switch (cmd->builtin) {
     case CD:
       status = builtin_cd(cmd->argv);
@@ -316,11 +326,11 @@ int run_builtin_command(struct command *cmd) {
 }
 
 /**
- * Evaluates the given string. It first parses the command. If the parse command
- * returns -1, there was an error so nothing happens. If cmd.argv[0] == NULL,
- * the user did not pass in a command so nothing happens. If the command is not
- * a builtin, it is passed off to the run_system_command. Otherwise it is passed
- * off to run_builtin_command.
+ *Evaluates the given string. It first parses the command. If the parse command
+ *returns -1, there was an error so nothing happens. If cmd.argv[0] == NULL,
+ *the user did not pass in a command so nothing happens. If the command is not
+ *a builtin, it is passed off to the run_system_command. Otherwise it is passed
+ *off to run_builtin_command.
  */
 int eval(char *cmdline) {
   struct command cmd;
@@ -329,18 +339,18 @@ int eval(char *cmdline) {
   strcpy(cmd.cmd, cmdline);
 
   // Parses the command
-  parse_strtok(&cmd);
+  parse( & cmd);
 
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
   } else if (cmd.builtin ==
-             (enum builtin_t)NONE) { // Runs the system command and returns
+    (enum builtin_t) NONE) { // Runs the system command and returns
 
-    run_system_command(&cmd);
+    run_system_command( & cmd);
     ret = 1;
   } else { // Runs builtin command and returns it's return value
-    ret = run_builtin_command(&cmd);
+    ret = run_builtin_command( & cmd);
   }
 
   return ret;
