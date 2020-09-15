@@ -32,19 +32,12 @@ struct background {
 static int bg_cmd_count = 0;
 static struct background *bg_cmds[40];
 
-void check_bg_cmds() {
+void clean_bg_cmds() {
   int i;
   int cur_count = 0;
 
   for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
-    bg_cmds[i]->code = getpgid(bg_cmds[i]->pid);
-
-    if (bg_cmds[i]->code == -1)
-      printf("[%d] Done %s\n", i + 1, bg_cmds[i]->cmds);
-  }
-
-  for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
-    if (bg_cmds[i]->code != -1) {
+    if (bg_cmds[i]->code == 0) {
       bg_cmds[cur_count] = bg_cmds[i];
       cur_count++;
     } else {
@@ -54,6 +47,26 @@ void check_bg_cmds() {
   }
 
   bg_cmd_count = cur_count;
+}
+
+void check_bg_cmds() {
+  int i;
+  int status;
+
+  for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
+    bg_cmds[i]->code = waitpid(bg_cmds[i]->pid, &status, WNOHANG);
+
+    if (bg_cmds[i]->code == -1) {
+      printf("[%d] Exit %d %s\n", i + 1, status, bg_cmds[i]->cmds);
+    } else if (bg_cmds[i]->code != 0) {
+      if (!status)
+        printf("[%d] Done %s\n", i + 1, bg_cmds[i]->cmds);
+      else
+        printf("[%d] Exit %d %s\n", i + 1, status, bg_cmds[i]->cmds);
+    }
+  }
+
+  clean_bg_cmds();
 }
 
 void insert_bg_cmd(pid_t pid, struct command cmd) {
@@ -68,6 +81,7 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   printf("[%d] %d\n", i + 1, pid);
 
   bg_cmd->pid = pid;
+  bg_cmd->code = 0;
   strcpy(bg_cmd->cmds, cmd.cmd);
 
   bg_cmds[i] = bg_cmd;
@@ -107,11 +121,31 @@ int builtin_cd(char **args) {
  *Runs the 'kill' command.
  */
 int builtin_kill(char **args) {
+  int i;
+  int found = 0;
+  pid_t pid;
+
   if (args[1] == NULL) {
     fprintf(stderr, "No PID provided");
     return -1;
   } else {
-    kill(atoi(args[1]), SIGKILL);
+    pid = atoi(args[1]);
+    kill(pid, SIGKILL);
+    
+    for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
+      if (bg_cmds[i]->pid == pid) {
+        printf("[%d] Terminated %s", i + 1, bg_cmds[i]->cmds);
+        bg_cmds[i]->code = -1;
+        found = 1;
+        break;
+      }
+    }
+
+    if (!found) {
+      fprintf(stderr, "Process with PID %d not found\n", pid);
+    } else {
+      clean_bg_cmds();
+    }
   }
 
   return 1;
@@ -352,6 +386,7 @@ int eval(char *cmdline) {
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
+    check_bg_cmds();
   } else if (cmd.builtin ==
              (enum builtin_t)NONE) { // Runs the system command and returns
 
