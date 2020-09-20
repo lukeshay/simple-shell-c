@@ -441,7 +441,7 @@ int main(void) {
     // fflush(stdout);
 
     if (fgets_r == NULL && ferror_r) {
-      fprintf(stderr, "fgets error");
+      fprintf(stderr, "\033[0mfgets error");
     }
 
     if (feof(stdin)) {
