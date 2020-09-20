@@ -5,7 +5,7 @@ RM = rm -f
 
 TERM = "\"S2019\""
 
-CFLAGS = -Wall -funroll-loops -DTERM=$(TERM) -ggdb3 -DNDEBUG
+CFLAGS = -Wall -funroll-loops -DTERM=$(TERM) -ggdb3 -DNDEBUG -std=c11 -pedantic
 CXXFLAGS = -Wall -funroll-loops -DTERM=$(TERM) # -ggdb3 -DNDEBUG
 
 LDFLAGS = -lncurses
