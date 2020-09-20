@@ -437,11 +437,11 @@ int main(void) {
     fgets_r = fgets(cmdline, MAX_LINE, stdin);
     ferror_r = ferror(stdin);
 
-    // printf("\033[0m");
-    // fflush(stdout);
+    printf("\033[0m");
+    fflush(stdout);
 
     if (fgets_r == NULL && ferror_r) {
-      fprintf(stderr, "\033[0mfgets error");
+      fprintf(stderr, "fgets error");
     }
 
     if (feof(stdin)) {
