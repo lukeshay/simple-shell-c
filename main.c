@@ -407,8 +407,6 @@ int eval(char *cmdline) {
   // Parses the command
   parse(&cmd);
 
-  printf("a\b");
-
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
@@ -439,8 +437,8 @@ int main(void) {
     fgets_r = fgets(cmdline, MAX_LINE, stdin);
     ferror_r = ferror(stdin);
 
-    printf("\033[0m");
-    fflush(stdout);
+    // printf("\033[0m");
+    // fflush(stdout);
 
     if (fgets_r == NULL && ferror_r) {
       fprintf(stderr, "fgets error");
