@@ -1,8 +1,0 @@
-LICENSE
-Makefile
-README.md
-main.c
-main.d
-main.o
-out.txt
-shell352

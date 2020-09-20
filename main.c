@@ -19,17 +19,19 @@ struct command {
   enum builtin_t builtin;
   enum redirect_t redirect;
   char *file;
-  char cmd[80];
+  char cmd[MAX_LINE];
   int bg;
 };
 
 struct background {
   pid_t pid;
   pid_t code;
-  char cmds[80];
+  int num;
+  char cmd[MAX_LINE];
 };
 
 static int bg_cmd_count = 0;
+static int bg_cmd_count_total = 1;
 static struct background *bg_cmds[40];
 
 void clean_bg_cmds() {
@@ -37,9 +39,13 @@ void clean_bg_cmds() {
   int cur_count = 0;
 
   for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
-    if (bg_cmds[i]->code == 0) {
-      bg_cmds[cur_count] = bg_cmds[i];
+    if (bg_cmds[i]->code == 0 && cur_count == i) {
       cur_count++;
+    } else if (bg_cmds[i]->code == 0) {
+      bg_cmds[cur_count] = malloc(sizeof(struct background));
+      *bg_cmds[cur_count++] = *bg_cmds[i];
+      free(bg_cmds[i]);
+      bg_cmds[i] = NULL;
     } else {
       free(bg_cmds[i]);
       bg_cmds[i] = NULL;
@@ -57,12 +63,15 @@ void check_bg_cmds() {
     bg_cmds[i]->code = waitpid(bg_cmds[i]->pid, &status, WNOHANG);
 
     if (bg_cmds[i]->code == -1) {
-      printf("[%d] Exit %d %s\n", i + 1, status, bg_cmds[i]->cmds);
+      printf("[%d] Exit %d %s\n", bg_cmds[i]->num, status, bg_cmds[i]->cmd);
     } else if (bg_cmds[i]->code != 0) {
-      if (!status)
-        printf("[%d] Done %s\n", i + 1, bg_cmds[i]->cmds);
-      else
-        printf("[%d] Exit %d %s\n", i + 1, status, bg_cmds[i]->cmds);
+      if (!status) {
+        printf("[%d] Done %s\n", bg_cmds[i]->num, bg_cmds[i]->cmd);
+        bg_cmds[i]->code = 1;
+      } else {
+        printf("[%d] Exit %d %s\n", bg_cmds[i]->num, status, bg_cmds[i]->cmd);
+        bg_cmds[i]->code = -1;
+      }
     }
   }
 
@@ -78,13 +87,14 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   for (i = 0; i < 40 && bg_cmds[i] != NULL; i++)
     ;
 
-  printf("[%d] %d\n", i + 1, pid);
-
   bg_cmd->pid = pid;
   bg_cmd->code = 0;
-  strcpy(bg_cmd->cmds, cmd.cmd);
+  bg_cmd->num = bg_cmd_count_total++;
+  strcpy(bg_cmd->cmd, cmd.cmd);
 
   bg_cmds[i] = bg_cmd;
+
+  printf("[%d] %d\n", bg_cmd->num, bg_cmd->pid);
 }
 
 int get_length(char *str) {
@@ -131,10 +141,10 @@ int builtin_kill(char **args) {
   } else {
     pid = atoi(args[1]);
     kill(pid, SIGKILL);
-    
+
     for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
       if (bg_cmds[i]->pid == pid) {
-        printf("[%d] Terminated %s", i + 1, bg_cmds[i]->cmds);
+        printf("[%d] Terminated %s\n", bg_cmds[i]->num, bg_cmds[i]->cmd);
         bg_cmds[i]->code = -1;
         found = 1;
         break;
@@ -179,20 +189,26 @@ void parse(struct command *cmd) {
   const char delims[10] = " \t\r\n";
   char *ptr;
   int length;
+  int redirected = 0;
+  char cmds[MAX_LINE];
+
+  strcpy(cmds, cmd->cmd);
 
   cmd->argc = 0;
   cmd->redirect = (enum redirect_t)NO;
   cmd->file = "";
   cmd->bg = 0;
 
-  ptr = strtok(cmd->cmd, delims);
+  ptr = strtok(cmds, delims);
 
   while (ptr != NULL) {
     length = get_length(ptr);
 
-    if (cmd->redirect != (enum redirect_t)NO) {
+    if (!redirected && cmd->redirect != (enum redirect_t)NO) {
       cmd->file = ptr;
-      break;
+      redirected = 1;
+      ptr = strtok(NULL, delims);
+      continue;
     } else {
       cmd->argv[cmd->argc++] = ptr;
     }
@@ -209,6 +225,10 @@ void parse(struct command *cmd) {
       break;
     }
 
+    if (redirected) {
+      break;
+    }
+
     ptr = strtok(NULL, delims);
   }
 
@@ -222,8 +242,12 @@ void parse(struct command *cmd) {
   cmd->builtin = parse_builtin(cmd);
 
   // Checks if the command should run the background
-  if ((cmd->bg = (*cmd->argv[cmd->argc - 1] == '&')) != 0)
+  if ((cmd->bg = (*cmd->argv[cmd->argc - 1] == '&')) != 0) {
     cmd->argv[--cmd->argc] = NULL;
+    length = get_length(cmd->cmd);
+
+    cmd->cmd[length - 2] = '\0';
+  }
 }
 
 /**
@@ -412,6 +436,9 @@ int main(void) {
     // Gets input from stdin
     fgets_r = fgets(cmdline, MAX_LINE, stdin);
     ferror_r = ferror(stdin);
+
+    printf("\033[0m");
+    fflush(stdout);
 
     if (fgets_r == NULL && ferror_r) {
       fprintf(stderr, "fgets error");
