@@ -407,7 +407,7 @@ int eval(char *cmdline) {
   // Parses the command
   parse(&cmd);
 
-  printf("1: %s", cmd.argv[0]);
+  printf("a\b");
 
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
