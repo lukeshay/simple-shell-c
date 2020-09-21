@@ -248,6 +248,7 @@ void parse(struct command *cmd) {
 
     cmd->cmd[length - 2] = '\0';
   }
+  printf("1: %s\n", cmd->argv[0]);
 }
 
 /**
@@ -293,10 +294,13 @@ void run_system_command(struct command *cmd) {
   pid_t child_pid;
   int fd;
 
+  printf("4: %s\n", cmd->argv[0]);
   // Forks the current process and sees if it is successful
   if ((child_pid = fork()) < 0) {
     fprintf(stderr, "fork() error");
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
+
+    printf("5: %s\n", cmd->argv[0]);
     // is the child process
     fd = redirect(
         cmd); // Calls redirect helper which redirects input/output if necessary
@@ -407,6 +411,8 @@ int eval(char *cmdline) {
   // Parses the command
   parse(&cmd);
 
+  printf("2: %s\n", cmd.argv[0]);
+
   // If bg is -1 or the command is NULL, we return to get the next command
   if (cmd.bg == -1 || cmd.argv[0] == NULL) {
     ret = 1;
@@ -414,6 +420,7 @@ int eval(char *cmdline) {
   } else if (cmd.builtin ==
              (enum builtin_t)NONE) { // Runs the system command and returns
 
+    printf("3: %s\n", cmd.argv[0]);
     run_system_command(&cmd);
     ret = 1;
   } else { // Runs builtin command and returns it's return value
