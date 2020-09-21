@@ -44,10 +44,10 @@ void clean_bg_cmds() {
     } else if (bg_cmds[i]->code == 0) {
       bg_cmds[cur_count] = malloc(sizeof(struct background));
       *bg_cmds[cur_count++] = *bg_cmds[i];
-      free(bg_cmds[i]);
+      // free(bg_cmds[i]);
       bg_cmds[i] = NULL;
     } else {
-      free(bg_cmds[i]);
+      // free(bg_cmds[i]);
       bg_cmds[i] = NULL;
     }
   }
