@@ -298,7 +298,6 @@ void run_system_command(struct command *cmd) {
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
 
     printf("5: %s\n", cmd->argv[0]);
-
     // is the child process
     fd = redirect(
         cmd); // Calls redirect helper which redirects input/output if necessary
