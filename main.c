@@ -1,3 +1,10 @@
+/**
+ * Author: Robert Shay
+ * Purpose: This file is the source code of a base shell written in the C
+ * language. The main method of this function starts a loop that waits for user
+ * input and parses and runs the commands.
+ * Language:  C
+ */
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -34,6 +41,10 @@ static int bg_cmd_count = 0;
 static int bg_cmd_count_total = 1;
 static struct background *bg_cmds[40];
 
+/**
+ * Cleans the commands list. It checks if the background command has finished,
+ * if it has, it is removed from the command list.
+ */
 void clean_bg_cmds() {
   int i;
   int cur_count = 0;
@@ -55,6 +66,12 @@ void clean_bg_cmds() {
   bg_cmd_count = cur_count;
 }
 
+/**
+ * Loops through the background commands and checks if they are still running.
+ * It will print a message if the command was finished or terminated
+ * unexpectedly. It thens calls the clean function to remove completed
+ * processes.
+ */
 void check_bg_cmds() {
   int i;
   int status;
@@ -78,6 +95,9 @@ void check_bg_cmds() {
   clean_bg_cmds();
 }
 
+/**
+ * Adds a background command to the list and prints the command number and PID.
+ */
 void insert_bg_cmd(pid_t pid, struct command cmd) {
   struct background *bg_cmd;
   int i;
@@ -97,6 +117,9 @@ void insert_bg_cmd(pid_t pid, struct command cmd) {
   printf("[%d] %d\n", bg_cmd->num, bg_cmd->pid);
 }
 
+/**
+ * Gets the length of a string.
+ */
 int get_length(char *str) {
   int len;
 
@@ -106,6 +129,9 @@ int get_length(char *str) {
   return len;
 }
 
+/**
+ * Waits for the given PID to finish.
+ */
 void wait_pid(pid_t pid) {
   while (waitpid(pid, NULL, 0) == 0)
     ;
