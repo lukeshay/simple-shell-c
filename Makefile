@@ -24,16 +24,16 @@ $(BIN): $(OBJS)
 
 clean:
 	@$(ECHO) Removing all generated files
-	@$(RM) *.o $(BIN) *.d TAGS core vgcore.* gmon.out *.dSYM packaged
+	@$(RM) *.o $(BIN) *.d TAGS core vgcore.* gmon.out *.dSYM lshay
 
 clobber: clean
 	@$(ECHO) Removing backup files
 	@$(RM) *~ \#* *pgm
 
 package: clean $(BIN)
-	@mkdir packaged
-	@cp main.c Makefile packaged
-	@zip -r lshay packaged 
+	@mkdir lshay
+	@cp main.c Makefile lshay
+	@zip -r lshay lshay 
 
 # etags:
 # 	@$(ECHO) Updating TAGS
