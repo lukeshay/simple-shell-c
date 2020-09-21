@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define PROMPT "\033[0;34mshell352>\033[0;32m "
+#define PROMPT "\033[0;34m352>\033[0;32m "
 #define MAX_LINE 80
 #define MAX_ARGS 128
 
