@@ -431,14 +431,14 @@ int main(void) {
 
   while (should_run) {
     printf("%s", PROMPT);
-    // fflush(stdout);
+    fflush(stdout);
 
     // Gets input from stdin
     fgets_r = fgets(cmdline, MAX_LINE, stdin);
     ferror_r = ferror(stdin);
 
-    // printf("\033[0m");
-    // fflush(stdout);
+    printf("\033[0m");
+    fflush(stdout);
 
     if (fgets_r == NULL && ferror_r) {
       fprintf(stderr, "fgets error");
