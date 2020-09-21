@@ -431,7 +431,7 @@ int main(void) {
 
   while (should_run) {
     printf("%s", PROMPT);
-    fflush(stdout);
+    // fflush(stdout);
 
     // Gets input from stdin
     fgets_r = fgets(cmdline, MAX_LINE, stdin);
