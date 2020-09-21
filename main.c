@@ -185,21 +185,18 @@ enum builtin_t parse_builtin(struct command *cmd) {
  *parsed command should run in the background. If it should, then 1 is
  *returned.
  */
-void parse(struct command *cmd) {
+void parse(struct command *cmd, char *cmdline) {
   const char delims[10] = " \t\r\n";
   char *ptr;
   int length;
   int redirected = 0;
-  char cmds[MAX_LINE];
-
-  strcpy(cmds, cmd->cmd);
 
   cmd->argc = 0;
   cmd->redirect = (enum redirect_t)NO;
   cmd->file = "";
   cmd->bg = 0;
 
-  ptr = strtok(cmds, delims);
+  ptr = strtok(cmdline, delims);
 
   while (ptr != NULL) {
     length = get_length(ptr);
@@ -301,6 +298,7 @@ void run_system_command(struct command *cmd) {
   } else if (child_pid == 0) { // Runs the command because the PID indicates it
 
     printf("5: %s\n", cmd->argv[0]);
+
     // is the child process
     fd = redirect(
         cmd); // Calls redirect helper which redirects input/output if necessary
@@ -409,7 +407,7 @@ int eval(char *cmdline) {
   strcpy(cmd.cmd, cmdline);
 
   // Parses the command
-  parse(&cmd);
+  parse(&cmd, cmdline);
 
   printf("2: %s\n", cmd.argv[0]);
 

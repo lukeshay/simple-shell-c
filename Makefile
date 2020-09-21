@@ -1,14 +1,8 @@
 CC = gcc
-CXX = g++
 ECHO = echo
 RM = rm -f
 
-TERM = "\"S2019\""
-
-CFLAGS = -Wall -funroll-loops -DTERM=$(TERM) -ggdb3 -DNDEBUG -std=c11 -pedantic -D_POSIX_C_SOURCE
-CXXFLAGS = -Wall -funroll-loops -DTERM=$(TERM) # -ggdb3 -DNDEBUG
-
-LDFLAGS = -lncurses
+CFLAGS = -Wall -funroll-loops -ggdb3 -DNDEBUG -std=c99 -pedantic -D_POSIX_C_SOURCE
 
 BIN = shell352
 OBJS = main.o
@@ -18,17 +12,13 @@ all: $(BIN) # etags
 
 $(BIN): $(OBJS)
 	@$(ECHO) Linking $@
-	@$(CXX) $^ -o $@ $(LDFLAGS)
+	@$(CC) $^ -o $@
 
 -include $(OBJS:.o=.d)
 
 %.o: %.c
 	@$(ECHO) Compiling $<
 	@$(CC) $(CFLAGS) -MMD -MF $*.d -c $<
-
-%.o: %.cpp
-	@$(ECHO) Compiling $<
-	@$(CXX) $(CXXFLAGS) -MMD -MF $*.d -c $<
 
 .PHONY: all clean clobber # etags
 
