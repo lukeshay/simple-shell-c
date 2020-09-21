@@ -44,10 +44,10 @@ void clean_bg_cmds() {
     } else if (bg_cmds[i]->code == 0) {
       bg_cmds[cur_count] = malloc(sizeof(struct background));
       *bg_cmds[cur_count++] = *bg_cmds[i];
-      // free(bg_cmds[i]);
+      free(bg_cmds[i]);
       bg_cmds[i] = NULL;
     } else {
-      // free(bg_cmds[i]);
+      free(bg_cmds[i]);
       bg_cmds[i] = NULL;
     }
   }
@@ -302,8 +302,8 @@ void run_system_command(struct command *cmd) {
 
     printf("5: %s\n", cmd->argv[0]);
     // is the child process
-    fd = redirect(
-        cmd); // Calls redirect helper which redirects input/output if necessary
+    // fd = redirect(
+        // cmd); // Calls redirect helper which redirects input/output if necessary
 
     if (fd == -1) {
       fprintf(stderr, "Error opening file '%s'", cmd->file);
