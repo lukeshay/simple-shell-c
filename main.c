@@ -140,7 +140,7 @@ int builtin_kill(char **args) {
     return -1;
   } else {
     pid = atoi(args[1]);
-    kill(pid, SIGKILL);
+    kill(pid, SIGTERM);
 
     for (i = 0; i < 40 && bg_cmds[i] != NULL; i++) {
       if (bg_cmds[i]->pid == pid) {
